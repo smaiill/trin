@@ -1,0 +1,8 @@
+node_modules
+scripts
+src
+tsconfig.json
+.prettierrc
+.prettierignore
+.github
+todo.txt
