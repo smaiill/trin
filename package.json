@@ -10,6 +10,16 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smaiill/trin.git"
+  },
+  "keywords": [
+    "translation",
+    "typescript",
+    "typesafe"
+  ],
+  "author": "smaiill",
   "scripts": {
     "lib:dev": "tsup --config scripts/dev.js",
     "lib:build": "pnpm lint && tsup --config scripts/build.js",
