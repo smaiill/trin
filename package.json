@@ -1,6 +1,6 @@
 {
   "name": "@smaiill/trin",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "small typesafe translation lib. (wip)",
   "files": [
     "dist"
