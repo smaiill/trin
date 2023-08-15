@@ -13,13 +13,13 @@ test('.overrideOptions', () => {
   // @ts-expect-error
   const o = overrideOptions()
 
-  expect(o).toEqual({ language: 'en' })
+  expect(o).toEqual({ locale: '' })
 
   const o2 = overrideOptions({
-    language: 'fr',
+    locale: 'fr',
   })
 
-  expect(o2).toEqual({ language: 'fr' })
+  expect(o2).toEqual({ locale: 'fr' })
 })
 
 test('.getTranslationValue', () => {
@@ -47,6 +47,16 @@ test('.replaceValueArgs', () => {
   )
 
   expect(formatedString).toBe('Hello im Smail and im 19')
+
+  const formatedString2 = replaceValueArgs(
+    'Hello im {{ name|lowercase }} and im {{ age }}',
+    {
+      name: 'Smail',
+      age: 19,
+    },
+  )
+
+  expect(formatedString2).toBe('Hello im smail and im 19')
 })
 
 test('.createTranslation', () => {
@@ -59,7 +69,7 @@ test('.createTranslation', () => {
       },
     },
     {
-      language: 'en',
+      locale: 'en',
     },
   )
 

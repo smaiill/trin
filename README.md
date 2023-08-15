@@ -1,6 +1,5 @@
 # trin
 
-> ⚠️ Work in Progress
-> Please note that trin is currently a work in progress and may not be fully stable or feature-complete
+> ⚠️ the library is still a work in progress (WIP).
 
-trin is a small typesafe translation library.
+`trin` is a small translation library thet i wanted to use for my personal projects.

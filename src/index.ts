@@ -1,4 +1,7 @@
-const TranslationArgumentMatchingRegex = new RegExp('{{\\s*(\\w+)\\s*}}', 'g')
+const TranslationArgumentMatchingRegex = new RegExp(
+  '{{\\s*(\\w+)((?:\\s*\\|\\s*\\w+)*)\\s*}}',
+  'g',
+)
 const TranslationConditionalMatchingRegex = new RegExp(
   '{{\\s+\\?\\.(\\w+)\\s+\\?\\s+([^:}]+)\\s*:\\s*([^}]+)}}',
   'g',
@@ -6,6 +9,11 @@ const TranslationConditionalMatchingRegex = new RegExp(
 
 type Separator = '.'
 type PossibleTypes = string | number | boolean
+
+export enum Modifiers {
+  Uppercase = 'uppercase',
+  Lowercase = 'lowercase',
+}
 
 type IsObjectEmptyAndHasNeighborKeys<
   O extends object,
@@ -134,19 +142,24 @@ type RecursiveRecord = {
 }
 
 type Options = {
-  language: string
+  locale: string
 }
 
 const defaultOptions = {
-  language: 'en',
+  locale: '',
 } as Options
+
+const currentTranslation: { locale: string; translations: string[] } = {
+  locale: '',
+  translations: [],
+}
 
 export const overrideOptions = (options: Options): Options => {
   const validatedOptions: Options = {
-    language:
-      options?.language && typeof options.language === 'string'
-        ? options.language
-        : defaultOptions.language,
+    locale:
+      options?.locale && typeof options.locale === 'string'
+        ? options.locale
+        : defaultOptions.locale,
   }
 
   return { ...defaultOptions, ...validatedOptions }
@@ -172,14 +185,18 @@ export const getTranslationValueWithPath = <
   )
 }
 
-export const replaceValueArgs = (
-  value: string,
-  args: RecordPossibleTypes,
-): string => {
+export const replaceValueArgs = (value: string, args: RecordPossibleTypes) => {
   const replaced = value.replace(
     TranslationArgumentMatchingRegex,
-    (_, argumentName) => {
-      return String(args[argumentName])
+    (_, argumentName, modifiersString) => {
+      const modifiers = modifiersString.split('|') as string[]
+
+      let str = args[argumentName].toString()
+
+      str = modifiers.includes(Modifiers.Uppercase) ? str.toUpperCase() : str
+      str = modifiers.includes(Modifiers.Lowercase) ? str.toLowerCase() : str
+
+      return str
     },
   )
 
@@ -207,7 +224,7 @@ export const getConditionValues = ({
   const _success = args[successValue] ?? successValue
   const _failure = args[failureValue] ?? failureValue
 
-  return { success: String(_success), failure: String(_failure) }
+  return { success: _success.toString(), failure: _failure.toString() }
 }
 
 export const replaceValueConditions = (
@@ -239,7 +256,15 @@ export const createTranslation = <M extends RecursiveRecord>(
   options: Options,
 ) => {
   const overridedOptions = overrideOptions(options)
-  const translation = overridedOptions.language
+
+  if (!Object.keys(translations).includes(overridedOptions.locale)) {
+    throw new Error('Invalid translation locale')
+  }
+
+  currentTranslation.locale = overridedOptions.locale
+  for (const locale of Object.keys(translations)) {
+    currentTranslation.translations.push(locale)
+  }
 
   const t = <K extends InferTranslationKeys<GetCorrectKeysFormat<M>>>(
     key: K,
@@ -250,11 +275,14 @@ export const createTranslation = <M extends RecursiveRecord>(
       : [ExtractKeyArgs<M, K>]
   ) => {
     const langaugeTranslations =
-      translations[translation as keyof typeof translations]
+      translations[currentTranslation.locale as keyof typeof translations]
 
     const keyValue = getTranslationValueWithPath(langaugeTranslations, key)
 
     if (!keyValue || typeof keyValue !== 'string') {
+      console.warn(
+        `Invalid translation for key: [${key}], in locale: [${currentTranslation.locale}]`,
+      )
       return key
     }
 
@@ -272,4 +300,12 @@ export const createTranslation = <M extends RecursiveRecord>(
   }
 
   return { t }
+}
+
+export const setLocale = (locale: string) => {
+  if (!currentTranslation.translations.includes(locale)) {
+    throw new Error('Invalid translation locale')
+  }
+
+  currentTranslation.locale = locale
 }
