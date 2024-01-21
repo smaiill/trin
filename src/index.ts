@@ -7,15 +7,21 @@ const TranslationConditionalMatchingRegex = new RegExp(
   'g',
 )
 
+const FIRST_REGEX = /{{\s+!.(\w+)\s+([^}]+)}}/gm
+const SECOND_REGEX =
+  /k\s*:\s*(\w+)\s+v\s*:\s*(['"])(.*?)\2(?:\s*k:(\w+)\s+v:\2(.*?)\2)*/gm
+
+const PluralizMatchingRegex = /\[plural.(\w+)]/gm
 type Separator = '.'
-type PossibleTypes = string | number | boolean
+type PossibleTypes = string | number | boolean | Date
 
 export enum Modifiers {
   Uppercase = 'uppercase',
   Lowercase = 'lowercase',
+  Capitalize = 'capitalize',
 }
 
-type IsObjectEmptyAndHasNeighborKeys<
+export type IsObjectEmptyAndHasNeighborKeys<
   O extends object,
   C extends boolean = false,
 > = O extends object
@@ -30,7 +36,7 @@ type IsObjectEmptyAndHasNeighborKeys<
     }[keyof O]
   : O
 
-type AllKeysExtendFromPossibleKeys<O extends object> = {
+export type AllKeysExtendFromPossibleKeys<O extends object> = {
   [K in keyof O as O[K] extends PossibleTypes ? K : never]: O[K]
 } extends infer N
   ? ObjectLength<object & N> extends ObjectLength<O>
@@ -38,7 +44,7 @@ type AllKeysExtendFromPossibleKeys<O extends object> = {
     : never
   : never
 
-type GetCorrectKeysFormat<O extends object> = O extends object
+export type GetCorrectKeysFormat<O extends object> = O extends object
   ? {
       [K in keyof O]: O[K] extends object
         ? IsObjectEmptyAndHasNeighborKeys<O[K]> extends never
@@ -195,6 +201,7 @@ export const replaceValueArgs = (value: string, args: RecordPossibleTypes) => {
 
       str = modifiers.includes(Modifiers.Uppercase) ? str.toUpperCase() : str
       str = modifiers.includes(Modifiers.Lowercase) ? str.toLowerCase() : str
+      str = modifiers.includes(Modifiers.Capitalize) ? capitalize(str) : str
 
       return str
     },
@@ -227,6 +234,9 @@ export const getConditionValues = ({
   return { success: _success.toString(), failure: _failure.toString() }
 }
 
+export const capitalize = (str: string) =>
+  str.charAt(0).toUpperCase() + str.slice(1)
+
 export const replaceValueConditions = (
   str: string,
   args: RecordPossibleTypes,
@@ -251,6 +261,62 @@ export const replaceValueConditions = (
   )
 }
 
+const extractCorrectInformations = (
+  str: string,
+): { target?: string; key?: string } => {
+  const all = [...str.matchAll(FIRST_REGEX)].at(0) as string[]
+
+  return { target: all.at(0), key: all.at(1) }
+}
+
+const extractCorrectReplacer = (key: string, str: string) => {
+  const value = [...str.matchAll(SECOND_REGEX)].find(
+    (_array) => _array.at(1) === key,
+  )
+
+  return value?.at(3) ?? ''
+}
+
+const replaceSwitchCases = (str: string, args: RecordPossibleTypes) => {
+  const info = extractCorrectInformations(str)
+
+  if (!info.key || !info.target) {
+    throw new Error('Invalid Informations')
+  }
+
+  const validArg = args[info.key] as string
+
+  const replacer = extractCorrectReplacer(validArg, info.target)
+
+  const finalString = str.replace(FIRST_REGEX, replacer)
+
+  return finalString
+}
+
+export const pluralizeAll = (str: string, args: RecordPossibleTypes) => {
+  return str.replace(PluralizMatchingRegex, (_, arg) => {
+    const validArg = args[arg]
+
+    if (!validArg) {
+      return ''
+    }
+
+    if (typeof validArg === 'number') {
+      return validArg > 1 ? 's' : ''
+    }
+
+    if (typeof validArg === 'boolean') {
+      return validArg === true ? 's' : ''
+    }
+
+    if (typeof validArg === 'string') {
+      return validArg.length > 1 ? 's' : ''
+    }
+
+    return ''
+  })
+}
+
 export const createTranslation = <M extends RecursiveRecord>(
   translations: object,
   options: Options,
@@ -272,7 +338,7 @@ export const createTranslation = <M extends RecursiveRecord>(
       object & ExtractKeyArgs<M, K>
     > extends never
       ? []
-      : [ExtractKeyArgs<M, K>]
+      : [RemoveEmptyObjects<ExtractKeyArgs<M, K>>]
   ) => {
     const langaugeTranslations =
       translations[currentTranslation.locale as keyof typeof translations]
@@ -286,17 +352,23 @@ export const createTranslation = <M extends RecursiveRecord>(
       return key
     }
 
-    const formatedWithArgs = args[0]
-      ? replaceValueArgs(keyValue, args[0] as unknown as RecordPossibleTypes)
+    const realArgs = args[0] as unknown as RecordPossibleTypes | undefined
+    const formatedWithArgs = realArgs
+      ? replaceValueArgs(keyValue, realArgs)
       : keyValue
-    const formatedWithConditions = args[0]
-      ? replaceValueConditions(
-          formatedWithArgs,
-          args[0] as unknown as RecordPossibleTypes,
-        )
+    const formatedWithConditions = realArgs
+      ? replaceValueConditions(formatedWithArgs, realArgs)
       : keyValue
 
-    return formatedWithConditions
+    const formatedWithPluralization = realArgs
+      ? pluralizeAll(formatedWithConditions, realArgs)
+      : keyValue
+
+    const formatedWithSwitchCase = realArgs
+      ? replaceSwitchCases(formatedWithPluralization, realArgs)
+      : keyValue
+
+    return formatedWithSwitchCase
   }
 
   return { t }

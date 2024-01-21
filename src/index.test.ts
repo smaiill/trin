@@ -1,10 +1,11 @@
-import { test, assert, expect } from 'vitest'
+import { test, expect } from 'vitest'
 import {
   createTranslation,
   getConditionStatus,
   getConditionValues,
   getTranslationValueWithPath,
   overrideOptions,
+  pluralizeAll,
   replaceValueArgs,
   replaceValueConditions,
 } from '.'
@@ -132,4 +133,20 @@ test('.replaceValueConditions', () => {
   const str3 = 'Hello {{ ?.a ? World : Smail }}'
   const newStr3 = replaceValueConditions(str3, { a: true })
   expect(newStr3).toBe('Hello World')
+})
+
+test('pluralizeAll', () => {
+  const str = 'Pomme[plural.count]'
+
+  const value = pluralizeAll(str, { count: 1 })
+
+  expect(value).toBe('Pomme')
+
+  const value2 = pluralizeAll(str, { count: 12 })
+
+  expect(value2).toBe('Pommes')
+
+  const value3 = pluralizeAll(str, { count: 'String' })
+
+  expect(value3).toBe('Pommes')
 })
