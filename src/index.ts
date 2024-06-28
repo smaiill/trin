@@ -2,10 +2,13 @@ const TranslationArgumentMatchingRegex = new RegExp(
   '{{\\s*(\\w+)((?:\\s*\\|\\s*\\w+)*)\\s*}}',
   'g',
 )
+
 const TranslationConditionalMatchingRegex = new RegExp(
   '{{\\s+\\?\\.(\\w+)\\s+\\?\\s+([^:}]+)\\s*:\\s*([^}]+)}}',
   'g',
 )
+
+const regexSubKeys = /\|\w(?:\.\w)+\|/gm
 
 const FIRST_REGEX = /{{\s+!.(\w+)\s+([^}]+)}}/gm
 const SECOND_REGEX =
@@ -14,6 +17,8 @@ const SECOND_REGEX =
 const PluralizMatchingRegex = /\[plural.(\w+)]/gm
 type Separator = '.'
 type PossibleTypes = string | number | boolean | Date
+
+type Rec = Record<string, object | string>
 
 export enum Modifiers {
   Uppercase = 'uppercase',
@@ -191,6 +196,45 @@ export const getTranslationValueWithPath = <
   )
 }
 
+const recursiveGetTranslationValueWithPath = (
+  langaugeTranslations: Rec,
+  key: string,
+) => {
+  const keyValue = getTranslationValueWithPath(langaugeTranslations, key)
+
+  if (!keyValue) {
+    return key
+  }
+
+  return replaceSubKeys(keyValue, langaugeTranslations)
+}
+
+const removeStartAndEnd = (value: string) => {
+  return value
+    .trim()
+    .slice(1, value.length)
+    .slice(0, value.length - 2)
+}
+
+export const replaceSubKeys = (
+  value: string,
+  langaugeTranslations: Rec,
+): string => {
+  if (!regexSubKeys.test(value)) {
+    return value
+  }
+
+  return value.replace(regexSubKeys, (a) => {
+    const key = removeStartAndEnd(a)
+    const keyValue = recursiveGetTranslationValueWithPath(
+      langaugeTranslations,
+      key,
+    )
+
+    return keyValue
+  })
+}
+
 export const replaceValueArgs = (value: string, args: RecordPossibleTypes) => {
   const replaced = value.replace(
     TranslationArgumentMatchingRegex,
@@ -338,7 +382,7 @@ export const createTranslation = <M extends RecursiveRecord>(
       object & ExtractKeyArgs<M, K>
     > extends never
       ? []
-      : [RemoveEmptyObjects<ExtractKeyArgs<M, K>>]
+      : [RemoveEmptyObjects<object & ExtractKeyArgs<M, K>>]
   ) => {
     const langaugeTranslations =
       translations[currentTranslation.locale as keyof typeof translations]
@@ -353,20 +397,24 @@ export const createTranslation = <M extends RecursiveRecord>(
     }
 
     const realArgs = args[0] as unknown as RecordPossibleTypes | undefined
+
+    const formatedWithSubKeys = replaceSubKeys(keyValue, langaugeTranslations)
+
     const formatedWithArgs = realArgs
-      ? replaceValueArgs(keyValue, realArgs)
-      : keyValue
+      ? replaceValueArgs(formatedWithSubKeys, realArgs)
+      : formatedWithSubKeys
+
     const formatedWithConditions = realArgs
       ? replaceValueConditions(formatedWithArgs, realArgs)
-      : keyValue
+      : formatedWithSubKeys
 
     const formatedWithPluralization = realArgs
       ? pluralizeAll(formatedWithConditions, realArgs)
-      : keyValue
+      : formatedWithSubKeys
 
     const formatedWithSwitchCase = realArgs
       ? replaceSwitchCases(formatedWithPluralization, realArgs)
-      : keyValue
+      : formatedWithSubKeys
 
     return formatedWithSwitchCase
   }

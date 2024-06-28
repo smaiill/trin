@@ -6,6 +6,7 @@ import {
   getTranslationValueWithPath,
   overrideOptions,
   pluralizeAll,
+  replaceSubKeys,
   replaceValueArgs,
   replaceValueConditions,
 } from '.'
@@ -149,4 +150,12 @@ test('pluralizeAll', () => {
   const value3 = pluralizeAll(str, { count: 'String' })
 
   expect(value3).toBe('Pommes')
+})
+
+test('replaceSubKeys', () => {
+  const str = 'Hello |h.w|'
+
+  const value = replaceSubKeys(str, { h: { w: 'World' } })
+
+  expect(value).toBe('Hello World')
 })
